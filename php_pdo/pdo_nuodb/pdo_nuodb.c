@@ -37,7 +37,7 @@
 #include "ext/pdo/php_pdo_driver.h"
 #include "php_pdo_nuodb.h"
 
-#include "php_pdb_nuodb_cpp_int.h"
+#include "php_pdo_nuodb_c_cpp_common.h"
 #include "php_pdo_nuodb_int.h"
 
 

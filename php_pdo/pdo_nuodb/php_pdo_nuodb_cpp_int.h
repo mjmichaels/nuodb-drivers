@@ -39,9 +39,6 @@
 #include <nuodb/sqlapi/SqlExceptions.h>
 
 
-using namespace nuodb::sqlapi;
-
-
 class PdoNuoDbStatement;
 
 class PdoNuoDbHandle {

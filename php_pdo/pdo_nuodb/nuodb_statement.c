@@ -30,7 +30,6 @@
 #include "config.h"
 #endif
 
-extern "C" {
 #include "php.h"
 #ifdef ZEND_ENGINE_2
 # include "zend_exceptions.h"
@@ -40,9 +39,8 @@ extern "C" {
 #include "pdo/php_pdo.h"
 #include "pdo/php_pdo_driver.h"
 #include "php_pdo_nuodb.h"
-}
 
-#include "php_pdo_nuodb_cpp_int.h"
+#include "php_pdo_nuodb_c_cpp_common.h"
 #include "php_pdo_nuodb_int.h"
 
 #include <time.h>
@@ -50,11 +48,9 @@ extern "C" {
 #define RECORD_ERROR(stmt) _nuodb_error(NULL, stmt,  __FILE__, __LINE__ TSRMLS_CC)
 #define CHAR_BUF_LEN 24
 
-static void _release_PdoNuoDbStatement(pdo_nuodb_stmt *S) {
-    if (S == NULL) return;
-    if (S->stmt == NULL) return;
-    delete S->stmt;
-    S->stmt = NULL;
+static void _release_PdoNuoDbStatement(pdo_nuodb_stmt * S)
+{
+	pdo_nuodb_stmt_delete(S);
 }
 
 /* called by PDO to clean up a statement handle */
@@ -73,32 +69,19 @@ static int nuodb_stmt_dtor(pdo_stmt_t *stmt TSRMLS_DC) /* {{{ */
 /* called by PDO to execute a prepared query */
 static int nuodb_stmt_execute(pdo_stmt_t *stmt TSRMLS_DC) /* {{{ */
 {
-	pdo_nuodb_stmt *S = (pdo_nuodb_stmt*)stmt->driver_data;
-	if (!S) return 0;
-	pdo_nuodb_db_handle *H = S->H;
-	if (!H) return 0;
-	unsigned long affected_rows = 0;
-    if (!S->stmt) return 0;
+	int status; 
 
-	// TODO: check that (!stmt->executed) here?
+    pdo_nuodb_stmt * S = (pdo_nuodb_stmt *)stmt->driver_data;
+    if (!S) {
+        return 0;
+    }
 
-    try
-    {
-        S->stmt->execute();
-        S->cursor_open = S->stmt->hasResultSet();
-        stmt->column_count = S->stmt->getColumnCount();
-    } catch(ErrorCodeException &e) {
+	status = pdo_nuodb_stmt_execute(S, &stmt->column_count, &stmt->row_count);
+	if (status == 0) {
         RECORD_ERROR(stmt);
         return 0;
     }
-    stmt->row_count = affected_rows;
-
-    // TODO: commit here?
-    H->db->commit();
-	S->exhausted = !S->cursor_open;
-
-	return 1;
-
+    return 1;
 }
 /* }}} */
 
@@ -106,43 +89,41 @@ static int nuodb_stmt_execute(pdo_stmt_t *stmt TSRMLS_DC) /* {{{ */
 static int nuodb_stmt_fetch(pdo_stmt_t *stmt, /* {{{ */
 	enum pdo_fetch_orientation ori, long offset TSRMLS_DC)
 {
-	pdo_nuodb_stmt *S = (pdo_nuodb_stmt*)stmt->driver_data;
-	pdo_nuodb_db_handle *H = S->H;
-
-	if (!stmt->executed) {
-		strcpy(stmt->error_code, "HY000");
-		H->last_app_error = "Cannot fetch from a closed cursor";
-	} else if (!S->exhausted) {
-	    if (S->stmt->next()) {
-            stmt->row_count++;
-            return 1;
-	    } else {
-	        S->exhausted = 1;
-	        return 0;
-	    }
-	}
-	return 0;
+    pdo_nuodb_stmt * S = (pdo_nuodb_stmt *)stmt->driver_data;
+    if (!stmt->executed)
+    {
+        strcpy_s(stmt->error_code, 5, "HY000");
+        pdo_nuodb_db_handle_set_last_app_error(S->H, "Cannot fetch from a closed cursor");
+		return 0;
+    }
+	return pdo_nuodb_stmt_fetch(S, &stmt->row_count);
 }
 /* }}} */
 
 /* called by PDO to retrieve information about the fields being returned */
 static int nuodb_stmt_describe(pdo_stmt_t *stmt, int colno TSRMLS_DC) /* {{{ */
 {
-	pdo_nuodb_stmt *S = (pdo_nuodb_stmt*)stmt->driver_data;
-	struct pdo_column_data *col = &stmt->columns[colno];
+    pdo_nuodb_stmt *S = (pdo_nuodb_stmt *)stmt->driver_data;
+    struct pdo_column_data *col = &stmt->columns[colno];
     char *cp;
+	char const *column_name;
+	int colname_len;
+	int sqlTypeNumber;
 
     col->precision = 0;
     col->maxlen = 0;
 
-    char const *column_name = S->stmt->getColumnName(colno);
-    if (column_name == NULL) return 0;
-    int colname_len = strlen(column_name);
+    column_name = pdo_nuodb_stmt_get_column_name(S, colno);
+    if (column_name == NULL)
+    {
+        return 0;
+    }
+    colname_len = strlen(column_name);
     col->namelen = colname_len;
 	col->name = cp = (char *) emalloc(colname_len + 1);
     memmove(cp, column_name, colname_len);
-	*(cp+colname_len) = '\0';
-    int sqlTypeNumber = S->stmt->getSqlType(colno);
+    *(cp+colname_len) = '\0';
+    sqlTypeNumber = pdo_nuodb_stmt_get_sql_type(S, colno);
     switch (sqlTypeNumber)
     {
     case PDO_NUODB_SQLTYPE_BOOLEAN:
@@ -190,6 +171,7 @@ static int nuodb_stmt_describe(pdo_stmt_t *stmt, int colno TSRMLS_DC) /* {{{ */
     }
 
     return 1;
+
 }
 /* }}} */
 
@@ -197,9 +179,10 @@ static int nuodb_stmt_get_col(pdo_stmt_t * stmt, int colno, char ** ptr, /* {{{ 
                               unsigned long * len, int * caller_frees TSRMLS_DC)
 {
     pdo_nuodb_stmt * S = (pdo_nuodb_stmt *)stmt->driver_data;
-    *len = 0;
+    int sqlTypeNumber = pdo_nuodb_stmt_get_sql_type(S, colno);
+
+	*len = 0;
     *ptr = NULL;
-    int sqlTypeNumber = S->stmt->getSqlType(colno);
     switch (sqlTypeNumber)
     {
         case PDO_NUODB_SQLTYPE_BOOLEAN:
@@ -246,14 +229,16 @@ static int nuodb_stmt_get_col(pdo_stmt_t * stmt, int colno, char ** ptr, /* {{{ 
         }
         case PDO_NUODB_SQLTYPE_INTEGER:
         {
+			unsigned int val = pdo_nuodb_stmt_get_integer(S, colno);
             *ptr = (char *)emalloc(CHAR_BUF_LEN);
-            *len = slprintf(*ptr, CHAR_BUF_LEN, "%ld", S->stmt->getInteger(colno));
+            *len = slprintf(*ptr, CHAR_BUF_LEN, "%ld", val);
             break;
         }
         case PDO_NUODB_SQLTYPE_BIGINT:
         {
+			unsigned long val = pdo_nuodb_stmt_get_long(S, colno);
             *ptr = (char *)emalloc(CHAR_BUF_LEN);
-            *len = slprintf(*ptr, CHAR_BUF_LEN, "%ld", S->stmt->getLong(colno));
+            *len = slprintf(*ptr, CHAR_BUF_LEN, "%ld", val);
             break;
         }
         case PDO_NUODB_SQLTYPE_DOUBLE:
@@ -262,12 +247,13 @@ static int nuodb_stmt_get_col(pdo_stmt_t * stmt, int colno, char ** ptr, /* {{{ 
         }
         case PDO_NUODB_SQLTYPE_STRING:
         {
-            const char * str = S->stmt->getString(colno);
+			int str_len;
+            const char * str = pdo_nuodb_stmt_get_string(S, colno);
             if (str == NULL)
             {
                 break;
             }
-            int str_len = strlen(str);
+            str_len = strlen(str);
             *ptr = (char *) emalloc(str_len+1);
             memmove(*ptr, str, str_len);
             *((*ptr)+str_len)= 0;
@@ -276,35 +262,51 @@ static int nuodb_stmt_get_col(pdo_stmt_t * stmt, int colno, char ** ptr, /* {{{ 
         }
         case PDO_NUODB_SQLTYPE_DATE:
         {
+            long d = pdo_nuodb_stmt_get_date(S, colno);
             *len = sizeof(long);
             *ptr = (char *)emalloc(*len);
-            long d = S->stmt->getDate(colno);
             memmove(*ptr, &d, *len);
             break;
         }
         case PDO_NUODB_SQLTYPE_TIME:
         {
+            unsigned long t = pdo_nuodb_stmt_get_time(S, colno);
             *len = sizeof(long);
             *ptr = (char *)emalloc(*len);
-            long t = S->stmt->getTime(colno);
             memmove(*ptr, &t, *len);
             break;
         }
         case PDO_NUODB_SQLTYPE_TIMESTAMP:
         {
+            unsigned long ts = pdo_nuodb_stmt_get_timestamp(S, colno);
             *len = sizeof(long);
             *ptr = (char *)emalloc(*len);
-            long ts = S->stmt->getTimestamp(colno);
             memmove(*ptr, &ts, *len);
             break;
         }
     }
 
-	return 1;
+    return 1;
+
 }
 /* }}} */
 
 
+    if (event_type == PDO_PARAM_EVT_FREE)   /* not used */
+    {
+        return 1;
+    }
+
+    if (!nuodb_params || param->paramno >= nuodb_params->num_params)
+    {
+        strcpy_s(stmt->error_code, 5, "HY093");
+        pdo_nuodb_db_handle_set_last_app_error(S->H, "Invalid parameter index");
+        return 0;
+    }
+
+    if (param->is_param && param->paramno == -1)
+    {
+        long * index;
 
 static int nuodb_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr,  /* {{{ */
 	unsigned long *len, int *caller_frees TSRMLS_DC)
@@ -355,7 +357,11 @@ static int nuodb_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr,  /* {{{ *
         }
         case PDO_NUODB_SQLTYPE_DATETIME:
         {
-            break;
+            // TODO: or by looking in the input descriptor
+            // for now, just return an error
+            strcpy_s(stmt->error_code, 5, "HY000");
+            pdo_nuodb_db_handle_set_last_app_error(S->H, "Unable to determine the parameter index");
+            return 0;
         }
     }
 
@@ -415,24 +421,24 @@ static int nuodb_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr,  /* {{{ *
 
 			switch (nuodb_param->sqltype & ~1) {
 				case PDO_NUODB_SQLTYPE_ARRAY:
-					strcpy(stmt->error_code, "HY000");
-					S->H->last_app_error = "Cannot bind to array field";
+					strcpy_s(stmt->error_code, 5, "HY000");
+					pdo_nuodb_db_handle_set_last_app_error(S->H, "Cannot bind to array field");
 					return 0;
 
 			}
 
 			switch (nuodb_param->sqltype) {
 			    case PDO_NUODB_SQLTYPE_INTEGER: {
-                    S->stmt->setInteger(param->paramno,  Z_LVAL_P(param->parameter));
+                    pdo_nuodb_stmt_set_integer(S, param->paramno,  Z_LVAL_P(param->parameter));
                     break;
 			    }
 			    case PDO_NUODB_SQLTYPE_STRING: {
-                    S->stmt->setString(param->paramno,  Z_STRVAL_P(param->parameter));
+                    pdo_nuodb_stmt_set_string(S, param->paramno,  Z_STRVAL_P(param->parameter));
                     break;
 			    }
 			    default: {
-					strcpy(stmt->error_code, "HY000");
-					S->H->last_app_error = "Cannot bind unsupported type!";
+					strcpy_s(stmt->error_code, 5, "HY000");
+					pdo_nuodb_db_handle_set_last_app_error(S->H, "Cannot bind unsupported type!");
 					return 0;
 					break;
 			    }
@@ -615,11 +621,3 @@ struct pdo_stmt_methods nuodb_stmt_methods = { /* {{{ */
 };
 /* }}} */
 
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

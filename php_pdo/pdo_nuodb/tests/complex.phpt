@@ -1,3 +1,6 @@
+--TEST--
+Complex test using the Hockey schema
+--FILE--
 <?php 
 
 $db = NULL;  
@@ -5,6 +8,37 @@ $db = NULL;
 function open_db() {
   $db = new PDO("nuodb:database=test@localhost;schema=Hockey", "dba", "goalie") or die;
   return $db;
+}
+ 
+function create_table_hockey_test() {
+  print("create table Hockey_test\n");
+  try {  
+    $db = open_db();
+    $sql = 'create table Hockey_test ( Id Integer not NULL generated always as identity primary key, Number Integer, Name String, Position String, Team String);';
+    $count = $db->exec($sql);
+    $sql = 'create unique index player_idx_test on Hockey_test (Number, Name, Team);';
+    $count = $db->exec($sql);
+    $sql = 'insert into Hockey_test select * from Hockey;';
+    $count = $db->exec($sql);
+    $db = NULL;
+  } catch(PDOException $e) {
+    print ("Failed\n");  
+    echo $e->getMessage();  
+  }
+  $db = NULL;  
+}
+
+function drop_table_hockey_test() {
+  print("drop table Hockey_test\n");
+  try {  
+    $db = open_db();
+    $sql = "drop table Hockey_test;";
+    $count = $db->exec($sql);
+    $db = NULL;
+  } catch(PDOException $e) {  
+    echo $e->getMessage();  
+  }
+  $db = NULL;  
 }
 
 function query_with_row_count($sql) {
@@ -23,15 +57,21 @@ function query_with_row_count($sql) {
   return $row_count;
 }
 
+// create table Hockey_test
+drop_table_hockey_test();
+create_table_hockey_test();
+
 // select test1
-$sql = "select * from hockey where NUMBER<12";
+print("select test1\n");
+$sql = "select * from Hockey_test where NUMBER<12";
 $row_count = query_with_row_count($sql);
 if ($row_count != 2) {
    print("FAILED row count: $sql\nExpected 2, got $row_count\n");
 }
 
 // select test2
-$sql = "select * from hockey";
+print("select test2\n");
+$sql = "select * from Hockey_test";
 $row_count = query_with_row_count($sql);
 if ($row_count != 25) {
    print("FAILED row count: $sql\nExpected 25, got $row_count\n");
@@ -39,9 +79,10 @@ if ($row_count != 25) {
 
 
 // insert test1
+print("insert test1\n");
 try {  
   $db = open_db();
-  $sql = "INSERT INTO hockey(NUMBER, NAME, POSITION, TEAM) VALUES('99', 'Mickey Mouse', 'Center', 'Disney')";
+  $sql = "INSERT INTO Hockey_test(NUMBER, NAME, POSITION, TEAM) VALUES('99', 'Mickey Mouse', 'Center', 'Disney')";
   $count = $db->exec($sql);
   $db = NULL;
 } catch(PDOException $e) {  
@@ -50,16 +91,18 @@ try {
 $db = NULL;  
 
 // select test3
-$sql = "select * from hockey";
+print("select test3\n");
+$sql = "select * from Hockey_test";
 $row_count = query_with_row_count($sql);
 if ($row_count != 26) {
    print("FAILED row count: $sql\nExpected 26, got $row_count\n");
 }
 
 // delete test1
+print("delete test1\n");
 try {  
   $db = open_db();
-  $sql = "DELETE FROM hockey WHERE TEAM='Disney'";
+  $sql = "DELETE FROM Hockey_test WHERE TEAM='Disney'";
   $count = $db->exec($sql);
   $db = NULL;
 } catch(PDOException $e) {  
@@ -68,7 +111,8 @@ try {
 $db = NULL;  
 
 // select test4
-$sql = "select * from hockey";
+print("select test4\n");
+$sql = "select * from Hockey_test";
 $row_count = query_with_row_count($sql);
 if ($row_count != 25) {
    print("FAILED row count: $sql\nExpected 25, got $row_count\n");
@@ -76,7 +120,8 @@ if ($row_count != 25) {
 $db = NULL;
 
 // select test5 - query and fetch with FETCH_ASSOC
-$sql = "select * from hockey where NUMBER=37";
+print("select test5\n");
+$sql = "select * from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $stmt = $db->query($sql);
@@ -100,7 +145,8 @@ try {
 $db = NULL;  
 
 // select test6 - query and fetch with FETCH_NUM
-$sql = "select * from hockey where NUMBER=37";
+print("select test6\n");
+$sql = "select * from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $stmt = $db->query($sql);
@@ -125,7 +171,8 @@ $db = NULL;
 
 
 // select test7 - query and fetch with FETCH_BOTH
-$sql = "select * from hockey where NUMBER=37";
+print("select test7\n");
+$sql = "select * from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $stmt = $db->query($sql);
@@ -161,7 +208,8 @@ try {
 $db = NULL;  
 
 // select test8 - query and fetch with FETCH_OBJ
-$sql = "select * from hockey where NUMBER=37";
+print("select test8\n");
+$sql = "select * from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $stmt = $db->query($sql);
@@ -185,7 +233,8 @@ try {
 $db = NULL;  
 
 // select test9 - query and fetchObject
-$sql = "select * from hockey where NUMBER=37";
+print("select test9\n");
+$sql = "select * from Hockey_test where NUMBER=37";
 class player {
   public $NUMBER;
   public $NAME;
@@ -216,7 +265,8 @@ try {
 $db = NULL;  
 
 // select test10 - failed query
-$sql = "select no_such_column from hockey where NUMBER=37";
+print("select test10\n");
+$sql = "select no_such_column from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $stmt = $db->query($sql);
@@ -225,12 +275,14 @@ try {
      print("FAILED: select test10\n");  
   }
 } catch(PDOException $e) {  
-  echo $e->getMessage();  
+  echo $e->getMessage();
+  print("\n");  
 }
 $db = NULL;  
 
 // select test11 - query and fetch with missing column.
-$sql = "select NAME from hockey where NUMBER=37";
+print("select test11\n");
+$sql = "select NAME from Hockey_test where NUMBER=37";
 try {  
   $db = open_db();
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
@@ -248,6 +300,30 @@ try {
 }
 $db = NULL;  
 
+drop_table_hockey_test();
 
 echo "\ndone\n";
 ?>
+
+--EXPECT--
+drop table Hockey_test
+create table Hockey_test
+select test1
+select test2
+insert test1
+select test3
+delete test1
+select test4
+select test5
+select test6
+select test7
+select test8
+select test9
+select test10
+SQLSTATE[HY000] [-1] can't resolve field "NO_SUCH_COLUMN"
+SQL: select no_such_column from Hockey_test where NUMBER=37
+select test11
+drop table Hockey_test
+
+done
+

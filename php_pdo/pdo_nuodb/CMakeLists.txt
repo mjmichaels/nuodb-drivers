@@ -5,53 +5,59 @@ cmake_minimum_required(VERSION 2.8)
 project(NUOPHPPDO)
 
 INCLUDE_DIRECTORIES (
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${NUOSQLAPI_ROOT}/include
-  ${PHP_INCLUDE}
-  ${PHP_INCLUDE}/main
-  ${PHP_INCLUDE}/TSRM
-  ${PHP_INCLUDE}/Zend
-  ${PHP_INCLUDE}/ext
-  ${PHP_INCLUDE}/ext/date/lib
-)
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${NUODB_INCLUDE_DIR}
+    ${PHP_INCLUDE_DIR}
+    ${PHP_INCLUDE_DIR}/main
+    ${PHP_INCLUDE_DIR}/TSRM
+    ${PHP_INCLUDE_DIR}/Zend
+    ${PHP_INCLUDE_DIR}/ext
+    ${PHP_INCLUDE_DIR}/ext/date/lib
+    )
 
-set (NuoDBPhpPdoSources
-    nuodb_driver.cpp
-    nuodb_statement.cpp
-    pdo_nuodb.cpp
+SET (NUODB_PHPPDO_SOURCES
+    nuodb_driver.c
+    pdo_nuodb.c
+    nuodb_statement.c
     php_pdo_nuodb_cpp_int.cpp
-    php_pdo_nuodb.h
-    php_pdo_nuodb_int.h
     php_pdo_nuodb_cpp_int.h
-)
+    php_pdo_nuodb_c_cpp_common.h
+    php_pdo_nuodb_int.h
+    php_pdo_nuodb.h
+    config.h
+    )
 
-IF(CMAKE_GENERATOR MATCHES "Unix Makefile")
-   add_definitions(-DPHP_ATOM_INC)
-   add_definitions(-DHAVE_CONFIG_H)
-   add_definitions(-DHAVE_DLFCN_H=1)
-   add_definitions(-Wno-write-strings)
-#   add_library(php5ts SHARED IMPORTED)
-   add_library(php5 SHARED IMPORTED)
-   add_library(NuoSqlApi SHARED IMPORTED)
-   set_property(TARGET NuoSqlApi PROPERTY IMPORTED_LOCATION ${NUOSQLAPI_ROOT}/lib/libNuoSqlApi.so)
-   set_property(TARGET NuoSqlApi PROPERTY IMPORTED_IMPLIB ${NUOSQLAPI_ROOT}/lib/libNuoSqlApi.so)
-   add_library(php_pdo_nuodb SHARED ${NuoDBPhpPdoSources})
-   target_link_libraries(php_pdo_nuodb NuoSqlApi )
-ENDIF(CMAKE_GENERATOR MATCHES "Unix Makefile")
+IF (CMAKE_GENERATOR MATCHES "Unix Makefiles" OR CMAKE_GENERATOR MATCHES "Xcode")
+    ADD_DEFINITIONS (-DPHP_ATOM_INC)
+    ADD_DEFINITIONS (-DHAVE_CONFIG_H)
+    ADD_DEFINITIONS (-DHAVE_DLFCN_H=1)
+    ADD_DEFINITIONS (-Wno-write-strings)
+    ADD_LIBRARY (NuoPhpPdo SHARED ${NUODB_PHPPDO_SOURCES})
+    LINK_DIRECTORIES (${NUODB_LIB_DIR})
+    TARGET_LINK_LIBRARIES (NuoPhpPdo ${NUODB_REMOTE_LIBRARY})
+    SET_TARGET_PROPERTIES (NuoPhpPdo PROPERTIES VERSION ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH} SOVERSION ${CPACK_PACKAGE_VERSION_MAJOR})
+    SET_TARGET_PROPERTIES(NuoPhpPdo PROPERTIES PREFIX "")
+    SET_TARGET_PROPERTIES (NuoPhpPdo PROPERTIES OUTPUT_NAME pdo_nuodb)
+ENDIF (CMAKE_GENERATOR MATCHES "Unix Makefiles" OR CMAKE_GENERATOR MATCHES "Xcode")
 
 IF(CMAKE_GENERATOR MATCHES "Visual Studio 7" OR
-   CMAKE_GENERATOR MATCHES "Visual Studio 8" OR
-   CMAKE_GENERATOR MATCHES "Visual Studio 9" OR
-   CMAKE_GENERATOR MATCHES "Visual Studio 10")
-   add_definitions(-DZTS=1 -DHAVE_CONFIG_H -DZEND_DEBUG=0 -DCOMPILE_DL_NUODB -DPHP_WIN32 -DZEND_WIN32)
-   add_library(php5ts SHARED IMPORTED)
-   set_property(TARGET php5ts PROPERTY IMPORTED_LOCATION ${PHP_ROOT}/php5ts.dll)
-   set_property(TARGET php5ts PROPERTY IMPORTED_IMPLIB ${PHP_ROOT}/SDK/lib/php5ts.lib)
-   add_library(nuoremote SHARED IMPORTED)
-   set_property(TARGET nuoremote PROPERTY IMPORTED_LOCATION ${NUODB_ROOT}/bin/NuoRemote.dll)
-   set_property(TARGET nuoremote PROPERTY IMPORTED_IMPLIB ${NUODB_ROOT}/lib/NuoRemote.lib)
-   add_library(php_pdo_nuodb SHARED ${NuoDBPhpSources})
-   target_link_libraries(php_pdo_nuodb nuoremote php5ts)
+    CMAKE_GENERATOR MATCHES "Visual Studio 8" OR
+    CMAKE_GENERATOR MATCHES "Visual Studio 9" OR
+    CMAKE_GENERATOR MATCHES "Visual Studio 10")
+    ADD_LIBRARY (php5ts SHARED IMPORTED)
+    ADD_LIBRARY (php5ts_debug SHARED IMPORTED)
+    SET_PROPERTY (TARGET php5ts PROPERTY IMPORTED_LOCATION ${PHP_ROOT}/php5ts.dll)
+    SET_PROPERTY (TARGET php5ts PROPERTY IMPORTED_IMPLIB ${PHP_ROOT}/SDK/lib/php5ts.lib)
+    SET_PROPERTY (TARGET php5ts_debug PROPERTY IMPORTED_LOCATION ${PHP_ROOT}/debug/php5ts_debug.dll)
+    SET_PROPERTY (TARGET php5ts_debug PROPERTY IMPORTED_IMPLIB ${PHP_ROOT}/debug/SDK/lib/php5ts_debug.lib)
+    ADD_LIBRARY (nuoremote SHARED IMPORTED)
+    SET_PROPERTY (TARGET nuoremote PROPERTY IMPORTED_LOCATION ${NUODB_ROOT}/bin/NuoRemote.dll)
+    SET_PROPERTY (TARGET nuoremote PROPERTY IMPORTED_IMPLIB ${NUODB_ROOT}/lib/NuoRemote.lib)
+    ADD_LIBRARY (NuoPhpPdo SHARED ${NUODB_PHPPDO_SOURCES})
+SET_PROPERTY (TARGET NuoPhpPdo PROPERTY COMPILE_DEFINITIONS ZTS=1 HAVE_CONFIG_H ZEND_DEBUG=0 COMPILE_DL_NUODB PHP_WIN32 ZEND_WIN32)
+SET_PROPERTY (TARGET NuoPhpPdo PROPERTY COMPILE_DEFINITIONS_DEBUG ZTS=1 HAVE_CONFIG_H ZEND_DEBUG=1 COMPILE_DL_NUODB PHP_WIN32 ZEND_WIN32)
+    TARGET_LINK_LIBRARIES (NuoPhpPdo nuoremote optimized php5ts debug php5ts_debug)
+    SET_TARGET_PROPERTIES (NuoPhpPdo PROPERTIES OUTPUT_NAME php_pdo_nuodb)
 ENDIF(CMAKE_GENERATOR MATCHES "Visual Studio 7" OR
       CMAKE_GENERATOR MATCHES "Visual Studio 8" OR
       CMAKE_GENERATOR MATCHES "Visual Studio 9" OR
