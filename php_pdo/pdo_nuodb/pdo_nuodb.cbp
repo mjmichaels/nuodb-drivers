@@ -21,15 +21,15 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="3" />
 				<Option compiler="gcc" />
-				<Option parameters="-c $HOME/php_debug.ini tests/curr_test.php" />
-				<Option host_application="/usr/local/bin/php" />
+				<Option parameters="tests/curr_test.php" />
+				<Option host_application="/usr/local/php-dbg/bin/php" />
 				<Option createDefFile="1" />
 				<Option createStaticLib="1" />
 				<Compiler>
 					<Add option="-g" />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="copy_php_extension php_pdo_nuodb.so" />
+					<Add after="copy_php_extension pdo_nuodb.so" />
 				</ExtraCommands>
 				<MakeCommands>
 					<Build command="$make -f $makefile" />
@@ -60,18 +60,24 @@
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Unit filename="config.h" />
-		<Unit filename="nuodb_driver.cpp" />
-		<Unit filename="nuodb_statement.cpp" />
-		<Unit filename="pdo_nuodb.cpp" />
+		<Unit filename="nuodb_driver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="nuodb_statement.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="pdo_nuodb.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="php_pdo_nuodb.h" />
+		<Unit filename="php_pdo_nuodb_c_cpp_common.h" />
 		<Unit filename="php_pdo_nuodb_cpp_int.cpp" />
 		<Unit filename="php_pdo_nuodb_cpp_int.h" />
 		<Unit filename="php_pdo_nuodb_int.h" />
 		<Extensions>
 			<code_completion>
-				<search_path add="/home/tgates/php-5.3.10" />
-				<search_path add="/home/tgates/nuodb/nuodb-api/src" />
-				<search_path add="/home/tgates/nuodb/nuodb-api/include" />
+				<search_path add="/home/tgates/php-5.3.10.NTS" />
+				<search_path add="/home/tgates/nuodb/nuodb_sources/nimbusdb" />
 			</code_completion>
 			<debugger />
 		</Extensions>

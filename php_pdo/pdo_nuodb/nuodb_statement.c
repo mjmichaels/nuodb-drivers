@@ -61,6 +61,16 @@ static int nuodb_stmt_dtor(pdo_stmt_t * stmt TSRMLS_DC) /* {{{ */
     pdo_nuodb_stmt * S = (pdo_nuodb_stmt *)stmt->driver_data;
     _release_PdoNuoDbStatement(S); /* release the statement */
 
+	if (S->sql) {
+        free(S->sql);
+        S->sql = NULL;
+    }
+
+    if (S->error_msg) {
+        free(S->error_msg);
+        S->error_msg = NULL;
+    }
+
     /* clean up the fetch buffers if they have been used */
     if (S->fetch_buf != NULL)
     {
@@ -74,7 +84,6 @@ static int nuodb_stmt_dtor(pdo_stmt_t * stmt TSRMLS_DC) /* {{{ */
         efree(S->fetch_buf);
         S->fetch_buf = NULL;
     }
-
 
     zend_hash_destroy(S->named_params);
     FREE_HASHTABLE(S->named_params);
@@ -93,7 +102,7 @@ static int nuodb_stmt_dtor(pdo_stmt_t * stmt TSRMLS_DC) /* {{{ */
 /* called by PDO to execute a prepared query */
 static int nuodb_stmt_execute(pdo_stmt_t * stmt TSRMLS_DC) /* {{{ */
 {
-	int status; 
+	int status;
 
     pdo_nuodb_stmt * S = (pdo_nuodb_stmt *)stmt->driver_data;
     if (!S) {
