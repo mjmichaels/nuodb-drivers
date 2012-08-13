@@ -32,7 +32,7 @@ function drop_table_hockey_test() {
   print("drop table Hockey_test\n");
   try {  
     $db = open_db();
-    $sql = "drop table Hockey_test;";
+    $sql = "drop table Hockey_test IF EXISTS;";
     $count = $db->exec($sql);
     $db = NULL;
   } catch(PDOException $e) {  

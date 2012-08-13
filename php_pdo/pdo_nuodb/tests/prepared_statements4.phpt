@@ -33,7 +33,7 @@ function drop_table_hockey_test() {
   print("drop table Hockey_test\n");
   try {  
     $db = open_db();
-    $sql = "drop table Hockey_test;";
+    $sql = "drop table Hockey_test if exists;";
     $count = $db->exec($sql);
     $db = NULL;
   } catch(PDOException $e) {  
@@ -46,6 +46,7 @@ try {
   $db = new PDO("nuodb:database=test@localhost;schema=Hockey", "dba", "goalie") or die;
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
   $position = NULL;
+  drop_table_hockey_test();
   create_table_hockey_test();
   $sql = "insert into Hockey_test(NUMBER, NAME, POSITION, TEAM) values (101, 'Tom Gates', NULL, NULL)";
   $stmt = $db->prepare($sql);
