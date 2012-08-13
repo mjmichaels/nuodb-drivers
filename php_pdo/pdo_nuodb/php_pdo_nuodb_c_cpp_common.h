@@ -29,11 +29,11 @@
 #ifndef PHP_PDO_NUODB_C_CPP_COMMON_H
 #define PHP_PDO_NUODB_C_CPP_COMMON_H
 
-/* 
+/*
 ** This is a common file that will be compiled by both C and C++.
-** The definitions here are use by both the "C/PHP/Zend" parts of this 
-** driver as well as the "C++/NuoDB" parts of this driver.   
-** 
+** The definitions here are use by both the "C/PHP/Zend" parts of this
+** driver as well as the "C++/NuoDB" parts of this driver.
+**
 */
 #define SHORT_MAX (1 << (8*sizeof(short)-1))
 
@@ -83,7 +83,7 @@ typedef struct
 extern "C" {
 #endif
 
-void nuodb_throw_zend_exception(const char *sql_state, int code, const char *msg); 
+void nuodb_throw_zend_exception(const char *sql_state, int code, const char *msg);
 
 typedef struct
 {
@@ -98,14 +98,15 @@ typedef struct
 
 } pdo_nuodb_db_handle;
 
-int pdo_nuodb_db_handle_commit(pdo_nuodb_db_handle *H); 
-int pdo_nuodb_db_handle_rollback(pdo_nuodb_db_handle *H); 
-int pdo_nuodb_db_handle_close_connection(pdo_nuodb_db_handle *H); 
-int pdo_nuodb_db_handle_delete(pdo_nuodb_db_handle *H); 
+int pdo_nuodb_db_handle_commit(pdo_nuodb_db_handle *H);
+int pdo_nuodb_db_handle_rollback(pdo_nuodb_db_handle *H);
+int pdo_nuodb_db_handle_close_connection(pdo_nuodb_db_handle *H);
+int pdo_nuodb_db_handle_delete(pdo_nuodb_db_handle *H);
 void *pdo_nuodb_db_handle_create_statement(pdo_nuodb_db_handle * H, const char *sql) ;
-long pdo_nuodb_db_handle_doer(pdo_nuodb_db_handle * H, void *dbh_opaque, const char *sql, unsigned in_txn, unsigned auto_commit, void (*pt2pdo_dbh_t_set_in_txn)(void *dbh_opaque, unsigned in_txn));  
+long pdo_nuodb_db_handle_doer(pdo_nuodb_db_handle * H, void *dbh_opaque, const char *sql, unsigned in_txn, unsigned auto_commit, void (*pt2pdo_dbh_t_set_in_txn)(void *dbh_opaque, unsigned in_txn));
 int pdo_nuodb_db_handle_factory(pdo_nuodb_db_handle * H, SqlOptionArray *optionsArray);
-void pdo_nuodb_db_handle_set_last_app_error(pdo_nuodb_db_handle *H, const char *err_msg); 
+void pdo_nuodb_db_handle_set_last_app_error(pdo_nuodb_db_handle *H, const char *err_msg);
+int pdo_nuodb_db_handle_last_id(pdo_nuodb_db_handle *H, const char *name);
 
 typedef struct
 {
@@ -137,6 +138,8 @@ typedef struct
 
     /* allocated space to convert fields values to other types */
     char ** fetch_buf;
+    int error_code;
+    char *error_msg;  // pointer to error_msg.  NULL if no error.
 
     /* the input params */
     nuo_params * in_params;

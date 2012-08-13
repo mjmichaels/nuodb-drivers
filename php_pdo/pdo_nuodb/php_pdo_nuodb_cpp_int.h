@@ -56,15 +56,18 @@ public:
     void closeConnection();
     void commit();
     void rollback();
+    int getLastId(const char *name);
 };
 
 class PdoNuoDbStatement
 {
 private:
     PdoNuoDbHandle * _dbh;
+    const char *_sql;
     NuoDB::PreparedStatement * _stmt;
-    int _stmt_type; // 0=unknown, 1=select, 2=update
+    int _stmt_type; // 0=unknown, 1=select, 2=update, 3=insert
     NuoDB::ResultSet * _rs;
+    NuoDB::ResultSet *_rs_gen_keys;
 public:
     PdoNuoDbStatement(PdoNuoDbHandle * dbh);
     ~PdoNuoDbStatement();
@@ -72,6 +75,7 @@ public:
     void execute();
     void executeQuery();
     bool hasResultSet();
+    bool hasGeneratedKeysResultSet();
     bool next();
     size_t getColumnCount();
     char const * getColumnName(size_t column);
@@ -83,6 +87,7 @@ public:
     unsigned long getDate(size_t column);
     unsigned long getTime(size_t column);
     size_t getNumberOfParameters();
+    int getGeneratedKeyLastId(const char *name);
 
     void setInteger(size_t index, int value);
     void setString(size_t index, const char *value);
